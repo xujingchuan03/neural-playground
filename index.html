@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="一个完全在浏览器中训练和运行的交互式神经网络实验台，用可视化方式理解分类模型、决策边界与过拟合。" />
+    <meta name="theme-color" content="#070b14" />
+    <title>神经网络实验台 · Neural Playground</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="返回首页">
+        <span class="brand-mark" aria-hidden="true">
+          <span class="node node-a"></span><span class="node node-b"></span><span class="node node-c"></span>
+          <span class="brand-line line-one"></span><span class="brand-line line-two"></span>
+        </span>
+        <span class="brand-copy"><strong>Neural Playground</strong><small>神经网络实验台</small></span>
+      </a>
+      <div class="topbar-meta">
+        <span class="local-badge"><i></i>浏览器本地训练</span>
+        <a href="#about">实验说明</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">AI FUNDAMENTALS · INTERACTIVE LAB</p>
+          <h1>看见神经网络<br /><span>如何学会分类。</span></h1>
+          <p class="hero-lead">生成数据、选择模型、启动训练，观察决策边界如何一步步形成。没有后端，没有 API Key，所有计算都发生在你的浏览器里。</p>
+        </div>
+        <div class="hero-stats" aria-label="当前实验状态">
+          <div class="hero-stat"><strong id="heroDataset">双月牙</strong><span>当前数据集</span></div>
+          <div class="hero-stat"><strong id="heroModel">小型 MLP</strong><span>模型结构</span></div>
+          <div class="hero-stat"><strong id="heroAcc">--</strong><span>测试准确率</span></div>
+        </div>
+      </section>
+
+      <section class="workspace" aria-label="神经网络训练工作区">
+        <aside class="panel controls">
+          <div class="panel-heading">
+            <div><span class="section-kicker">EXPERIMENT SETUP</span><h2>实验参数</h2></div>
+            <span class="step-badge">01</span>
+          </div>
+
+          <div class="beginner-tip">
+            <span>第一次使用？</span>
+            <p>不用理解参数。点击“一键演示”，网站会自动选择模型并开始训练。</p>
+          </div>
+
+          <button class="button button-demo" id="demoButton" type="button">
+            <span class="demo-icon" aria-hidden="true">▶</span>
+            <span><strong>一键演示</strong><small>自动配置并开始训练</small></span>
+          </button>
+
+          <div class="divider"></div>
+
+          <div class="control-group">
+            <div class="control-head">
+              <span class="control-label">数据集</span>
+              <span class="muted" id="datasetHint">两个交错的月牙</span>
+            </div>
+            <div class="segmented segmented-datasets" id="datasetTabs" role="group" aria-label="选择数据集">
+              <button class="active" type="button" data-dataset="moons">双月牙</button>
+              <button type="button" data-dataset="circles">同心圆</button>
+              <button type="button" data-dataset="spiral">螺旋</button>
+              <button type="button" data-dataset="xor">XOR</button>
+            </div>
+          </div>
+
+          <div class="range-field">
+            <label for="noiseRange"><span>噪声强度</span><output id="noiseValue">0.15</output></label>
+            <input id="noiseRange" type="range" min="0" max="0.45" step="0.01" value="0.15" />
+          </div>
+
+          <div class="range-field">
+            <label for="sampleRange"><span>训练样本数</span><output id="sampleValue">400</output></label>
+            <input id="sampleRange" type="range" min="160" max="800" step="20" value="400" />
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="control-group">
+            <div class="control-head">
+              <span class="control-label">模型结构</span>
+              <span class="muted">隐藏层决定非线性能力</span>
+            </div>
+            <div class="model-options" id="modelOptions">
+              <label class="model-option">
+                <input type="radio" name="model" value="linear" />
+                <span class="model-option-body"><span class="model-name">线性分类器</span><span class="model-desc">没有隐藏层 · 只能画直线</span></span>
+                <span class="model-arrow" aria-hidden="true">→</span>
+              </label>
+              <label class="model-option active">
+                <input type="radio" name="model" value="small" checked />
+                <span class="model-option-body"><span class="model-name">小型 MLP</span><span class="model-desc">1 个隐藏层 · 8 个神经元</span></span>
+                <span class="model-arrow" aria-hidden="true">→</span>
+              </label>
+              <label class="model-option">
+                <input type="radio" name="model" value="deep" />
+                <span class="model-option-body"><span class="model-name">深层 MLP</span><span class="model-desc">2 个隐藏层 · 16 + 8 个神经元</span></span>
+                <span class="model-arrow" aria-hidden="true">→</span>
+              </label>
+            </div>
+          </div>
+
+          <details class="advanced-params">
+            <summary>进阶参数 <span>可跳过</span></summary>
+            <div class="range-field">
+              <label for="lrRange"><span>学习率</span><output id="lrValue">0.010</output></label>
+              <input id="lrRange" type="range" min="0.001" max="0.05" step="0.001" value="0.01" />
+            </div>
+            <div class="range-field">
+              <label for="epochRange"><span>最大训练轮数</span><output id="epochValueMax">600</output></label>
+              <input id="epochRange" type="range" min="100" max="1200" step="50" value="600" />
+            </div>
+          </details>
+
+          <div class="action-grid">
+            <button class="button button-primary" id="trainButton" type="button">开始训练</button>
+            <button class="button" id="resetButton" type="button">重置模型</button>
+          </div>
+          <button class="button button-ghost" id="regenerateButton" type="button">重新采样数据</button>
+
+          <div class="challenge-card">
+            <div class="challenge-top">
+              <span class="challenge-icon" aria-hidden="true">◎</span>
+              <span>挑战目标</span>
+              <strong id="challengeValue">0 / 95%</strong>
+            </div>
+            <p id="challengeText">先训练模型，再挑战 95% 测试准确率。</p>
+            <div class="challenge-track"><span id="challengeBar"></span></div>
+          </div>
+        </aside>
+
+        <div class="stage">
+          <section class="panel visualization-panel">
+            <header class="panel-head">
+              <div><span class="section-kicker">DECISION BOUNDARY</span><h2 id="vizTitle">双月牙</h2></div>
+              <div class="legend" aria-label="图例">
+                <span><i class="legend-dot dot-a"></i>类别 A</span>
+                <span><i class="legend-dot dot-b"></i>类别 B</span>
+                <label class="mini-toggle"><input id="showTestToggle" type="checkbox" checked />测试集</label>
+              </div>
+            </header>
+
+            <div class="canvas-wrap" id="canvasWrap">
+              <canvas id="decisionCanvas" aria-label="分类决策边界可视化"></canvas>
+              <div class="canvas-note">悬停查看任意位置的预测</div>
+              <div class="hover-tooltip" id="hoverTooltip" hidden></div>
+            </div>
+
+            <div class="metrics-grid">
+              <div class="metric"><span>训练轮数</span><strong id="epochValue">0</strong><small id="epochTotal">/ 600</small></div>
+              <div class="metric"><span>训练准确率</span><strong id="trainAccValue">--</strong><small>train</small></div>
+              <div class="metric"><span>测试准确率</span><strong id="testAccValue">--</strong><small>test</small></div>
+              <div class="metric"><span>测试损失</span><strong id="lossValue">--</strong><small>cross entropy</small></div>
+            </div>
+          </section>
+
+          <div class="stage-lower">
+            <section class="panel chart-panel">
+              <header class="chart-head">
+                <div><span class="section-kicker">OPTIMIZATION</span><h3>损失曲线</h3></div>
+                <div class="chart-legend"><span><i class="legend-line line-train"></i>训练</span><span><i class="legend-line line-test"></i>测试</span></div>
+              </header>
+              <div class="chart-wrap"><canvas id="lossChart" aria-label="损失曲线"></canvas></div>
+            </section>
+
+            <section class="panel chart-panel">
+              <header class="chart-head">
+                <div><span class="section-kicker">PERFORMANCE</span><h3>准确率曲线</h3></div>
+                <div class="chart-legend"><span><i class="legend-line line-train"></i>训练</span><span><i class="legend-line line-test"></i>测试</span></div>
+              </header>
+              <div class="chart-wrap"><canvas id="accuracyChart" aria-label="准确率曲线"></canvas></div>
+            </section>
+          </div>
+
+          <div class="stage-bottom">
+            <section class="panel matrix-panel">
+              <header class="mini-panel-head">
+                <div><span class="section-kicker">TEST SET</span><h3>混淆矩阵</h3></div>
+                <span class="muted" id="cmTotal">0 个测试样本</span>
+              </header>
+              <table class="confusion-matrix">
+                <thead><tr><th></th><th>预测 A</th><th>预测 B</th></tr></thead>
+                <tbody>
+                  <tr><th>真实 A</th><td id="cm00">0</td><td id="cm01">0</td></tr>
+                  <tr><th>真实 B</th><td id="cm10">0</td><td id="cm11">0</td></tr>
+                </tbody>
+              </table>
+            </section>
+
+            <section class="panel model-panel">
+              <header class="mini-panel-head">
+                <div><span class="section-kicker">MODEL CARD</span><h3>模型信息</h3></div>
+                <div class="export-actions">
+                  <button class="icon-button" id="exportImageButton" type="button" title="导出决策边界截图">截图</button>
+                  <button class="icon-button" id="exportJsonButton" type="button" title="导出实验数据">JSON</button>
+                </div>
+              </header>
+              <dl class="model-facts">
+                <div><dt>网络结构</dt><dd id="architectureValue">2 → 8 → 2</dd></div>
+                <div><dt>可训练参数</dt><dd id="paramsValue">--</dd></div>
+                <div><dt>样本数量</dt><dd id="dataCountValue">--</dd></div>
+                <div><dt>数据种子</dt><dd id="seedValue">--</dd></div>
+              </dl>
+              <p class="model-tip" id="modelTip">非线性模型可以弯曲决策边界，从而更好地贴合复杂数据。</p>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="about" id="about">
+        <div class="about-head">
+          <div><p class="eyebrow">HOW IT WORKS</p><h2>这个实验台在做什么？</h2></div>
+          <p>它把“数据—模型—训练—评估”压缩成一个可观察的闭环。</p>
+        </div>
+        <div class="about-grid">
+          <article class="about-card"><span class="about-index">01</span><h3>生成数据</h3><p>每个数据集包含两个类别。训练集用于更新参数，测试集只用于评估泛化能力，不参与训练。</p></article>
+          <article class="about-card"><span class="about-index">02</span><h3>前向传播</h3><p>二维坐标进入网络，经过 tanh 隐藏层，最后由 softmax 输出两个类别的概率。</p></article>
+          <article class="about-card"><span class="about-index">03</span><h3>反向传播</h3><p>交叉熵损失衡量预测与真实标签的差距，梯度反向传播，Adam 优化器更新每一层参数。</p></article>
+          <article class="about-card"><span class="about-index">04</span><h3>观察泛化</h3><p>当训练准确率很高但测试准确率停滞，说明模型可能过拟合。试着增加噪声或换更深的网络。</p></article>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>Neural Playground · 人工智能基础与应用课程作品</span>
+      <span>零依赖 · 本地训练 · 数据不上传</span>
+    </footer>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>

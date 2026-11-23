@@ -94,9 +94,15 @@ function generateRaw(kind, count, noise, random) {
   return points;
 }
 
-export function createDataset(kind, sampleCount, noise, seed) {
+export function createDataset(kind, sampleCount, noise, seed, labelNoise = 0) {
   const definition = DATASETS[kind] || DATASETS.moons;
   const train = generateRaw(kind, Math.max(80, Math.round(sampleCount)), noise, mulberry32(seed));
+  if (labelNoise > 0) {
+    const flipRandom = mulberry32((seed + 4242) >>> 0);
+    for (const point of train) {
+      if (flipRandom() < labelNoise) point.label = 1 - point.label;
+    }
+  }
   const testCount = Math.max(80, Math.round(train.length * 0.35));
   const test = generateRaw(kind, testCount, noise, mulberry32(seed + 7919));
 
@@ -110,6 +116,7 @@ export function createDataset(kind, sampleCount, noise, seed) {
     tip: definition.tip,
     domain: 1.55,
     noise,
+    labelNoise,
     seed,
     train,
     test,

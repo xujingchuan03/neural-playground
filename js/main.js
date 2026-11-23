@@ -1,14 +1,18 @@
 import { createDataset, DATASETS } from "./data.js";
 import { MLP, MODEL_PRESETS } from "./network.js";
 import { LineChart } from "./charts.js";
+import { Tutor } from "./levels.js";
 
 const byId = (id) => document.getElementById(id);
 
 const elements = {
+  heroStartButton: byId("heroStartButton"),
   datasetTabs: byId("datasetTabs"),
   datasetHint: byId("datasetHint"),
   noiseRange: byId("noiseRange"),
   noiseValue: byId("noiseValue"),
+  labelNoiseRange: byId("labelNoiseRange"),
+  labelNoiseValue: byId("labelNoiseValue"),
   sampleRange: byId("sampleRange"),
   sampleValue: byId("sampleValue"),
   modelOptions: byId("modelOptions"),
@@ -56,6 +60,7 @@ const elements = {
 const state = {
   kind: "moons",
   noise: 0.15,
+  labelNoise: 0,
   sampleCount: 400,
   modelKey: "small",
   learningRate: 0.01,
@@ -87,6 +92,7 @@ const contourField = new Float32Array(contourResolution * contourResolution);
 const canvasSize = { width: 0, height: 0, pixelRatio: 0 };
 const challengeTarget = 0.95;
 let toastTimer = 0;
+let tutor = null;
 
 function formatPercent(value) {
   if (!Number.isFinite(value)) return "--";
@@ -115,6 +121,56 @@ function buildModel() {
   state.testMetrics = state.model.evaluate(state.dataset.test);
 }
 
+function tutorSnapshot() {
+  return {
+    kind: state.kind,
+    noise: state.noise,
+    labelNoise: state.labelNoise,
+    sampleCount: state.sampleCount,
+    modelKey: state.modelKey,
+    learningRate: state.learningRate,
+    maxEpochs: state.maxEpochs,
+    epoch: state.epoch,
+    training: state.training,
+    finished: state.epoch > 0 && state.epoch >= state.maxEpochs,
+    trainAcc: state.trainMetrics ? state.trainMetrics.accuracy : 0,
+    testAcc: state.testMetrics ? state.testMetrics.accuracy : 0,
+    testLoss: state.testMetrics ? state.testMetrics.loss : 0,
+    params: state.model ? state.model.countParameters() : 0,
+    architecture: state.model ? state.model.architecture() : "",
+  };
+}
+
+function applyTutorSetup(config = {}, level = null, options = {}) {
+  const keys = Object.keys(config);
+  const datasetChanged =
+    (config.kind !== undefined && config.kind !== state.kind) ||
+    (config.noise !== undefined && config.noise !== state.noise) ||
+    (config.labelNoise !== undefined && config.labelNoise !== state.labelNoise) ||
+    (config.sampleCount !== undefined && config.sampleCount !== state.sampleCount);
+
+  if (config.kind !== undefined && DATASETS[config.kind]) state.kind = config.kind;
+  if (config.noise !== undefined) state.noise = config.noise;
+  if (config.labelNoise !== undefined) state.labelNoise = config.labelNoise;
+  if (config.sampleCount !== undefined) state.sampleCount = config.sampleCount;
+  if (config.modelKey !== undefined && MODEL_PRESETS[config.modelKey]) state.modelKey = config.modelKey;
+  if (config.learningRate !== undefined) state.learningRate = config.learningRate;
+  if (config.maxEpochs !== undefined) state.maxEpochs = config.maxEpochs;
+
+  state.initCounter = 0;
+  syncControls();
+
+  if (datasetChanged) {
+    state.seed = (state.seed + 1) >>> 0;
+    regenerateData({ quiet: true });
+  } else {
+    resetModel({ quiet: true });
+  }
+  updateAll();
+
+  if (keys.length && !options.quiet) showToast("已按关卡设置好参数，照步骤操作即可。");
+}
+
 function resetModel(options = {}) {
   const { freshInit = false, quiet = false } = options;
   state.runToken += 1;
@@ -132,7 +188,7 @@ function regenerateData(options = {}) {
   state.training = false;
   state.paused = false;
   state.initCounter = 0;
-  state.dataset = createDataset(state.kind, state.sampleCount, state.noise, state.seed);
+  state.dataset = createDataset(state.kind, state.sampleCount, state.noise, state.seed, state.labelNoise);
   buildModel();
   updateAll();
   if (!quiet) showToast(toastMessage);
@@ -155,12 +211,14 @@ function startTraining() {
   elements.hoverTooltip.hidden = true;
   updateControlState();
   launchTraining();
+  tutor?.refresh();
 }
 
 function pauseTraining() {
   state.paused = true;
   state.runToken += 1;
   updateControlState();
+  tutor?.refresh();
   showToast("训练已暂停，可以继续调整参数。");
 }
 
@@ -186,6 +244,10 @@ function finishTraining() {
   state.runToken += 1;
   updateControlState();
   updateMetrics();
+  if (tutor) {
+    tutor.recordRun(tutorSnapshot());
+    tutor.refresh();
+  }
   const accuracy = state.testMetrics ? state.testMetrics.accuracy : 0;
   if (accuracy >= challengeTarget) {
     showToast(`训练完成，测试准确率 ${formatPercent(accuracy)}，挑战达成！`);
@@ -223,6 +285,7 @@ function trainingFrame(token) {
   drawCharts();
   updateMetrics();
   updateControlState();
+  if (state.epoch % 5 === 0) tutor?.refresh();
 
   if (state.epoch >= state.maxEpochs) {
     finishTraining();
@@ -238,6 +301,7 @@ function runDemo() {
   state.paused = false;
   state.modelKey = state.kind === "spiral" ? "deep" : "small";
   state.learningRate = 0.012;
+  state.labelNoise = 0;
   state.maxEpochs = 600;
   state.seed = (state.seed + 1) >>> 0;
   state.initCounter = 0;
@@ -320,6 +384,7 @@ function updateAll() {
   updateControlState();
   drawCharts();
   renderCanvas();
+  tutor?.refresh();
 }
 
 function drawCharts() {
@@ -574,6 +639,7 @@ function handlePointerMove(event) {
   const confidence = Math.max(probabilities[0], probabilities[1]);
 
   state.hover = { dataX, dataY, label, confidence, probabilities };
+  tutor?.noteHover();
   elements.hoverTooltip.innerHTML = `<strong>预测：类别 ${label === 0 ? "A" : "B"}</strong>置信度 ${(confidence * 100).toFixed(1)}%<br>P(A) ${(probabilities[0] * 100).toFixed(1)}% · P(B) ${(probabilities[1] * 100).toFixed(1)}%`;
   elements.hoverTooltip.hidden = false;
 
@@ -597,6 +663,8 @@ function handlePointerLeave() {
 function syncControls() {
   elements.noiseRange.value = String(state.noise);
   elements.noiseValue.textContent = state.noise.toFixed(2);
+  elements.labelNoiseRange.value = String(state.labelNoise);
+  elements.labelNoiseValue.textContent = `${Math.round(state.labelNoise * 100)}%`;
   elements.sampleRange.value = String(state.sampleCount);
   elements.sampleValue.textContent = String(state.sampleCount);
   elements.lrRange.value = String(state.learningRate);
@@ -629,6 +697,7 @@ function bindEvents() {
   elements.noiseRange.addEventListener("input", (event) => {
     state.noise = Number(event.target.value);
     elements.noiseValue.textContent = state.noise.toFixed(2);
+    tutor?.refresh();
   });
 
   elements.noiseRange.addEventListener("change", () => {
@@ -637,9 +706,22 @@ function bindEvents() {
     regenerateData({ toastMessage: "噪声强度已更新。" });
   });
 
+  elements.labelNoiseRange.addEventListener("input", (event) => {
+    state.labelNoise = Number(event.target.value);
+    elements.labelNoiseValue.textContent = `${Math.round(state.labelNoise * 100)}%`;
+    tutor?.refresh();
+  });
+
+  elements.labelNoiseRange.addEventListener("change", () => {
+    state.seed = (state.seed + 1) >>> 0;
+    state.initCounter = 0;
+    regenerateData({ toastMessage: "训练集错误标签比例已更新。" });
+  });
+
   elements.sampleRange.addEventListener("input", (event) => {
     state.sampleCount = Number(event.target.value);
     elements.sampleValue.textContent = String(state.sampleCount);
+    tutor?.refresh();
   });
 
   elements.sampleRange.addEventListener("change", () => {
@@ -660,6 +742,7 @@ function bindEvents() {
   elements.lrRange.addEventListener("input", (event) => {
     state.learningRate = Number(event.target.value);
     elements.lrValue.textContent = state.learningRate.toFixed(3);
+    tutor?.refresh();
   });
 
   elements.epochRange.addEventListener("input", (event) => {
@@ -667,9 +750,11 @@ function bindEvents() {
     elements.epochValueMax.textContent = String(state.maxEpochs);
     updateMetrics();
     drawCharts();
+    tutor?.refresh();
   });
 
   elements.demoButton.addEventListener("click", runDemo);
+  elements.heroStartButton.addEventListener("click", () => tutor?.focusCard());
   elements.trainButton.addEventListener("click", toggleTraining);
   elements.resetButton.addEventListener("click", () => resetModel({ freshInit: true }));
   elements.regenerateButton.addEventListener("click", () => {
@@ -736,6 +821,7 @@ function exportExperiment() {
       kind: state.dataset.kind,
       name: state.dataset.name,
       noise: state.dataset.noise,
+      labelNoise: state.dataset.labelNoise,
       seed: state.dataset.seed,
       trainSamples: state.dataset.train.length,
       testSamples: state.dataset.test.length,
@@ -766,9 +852,20 @@ function initialize() {
   charts.accuracy = new LineChart(elements.accuracyChart, "accuracy");
   bindEvents();
   syncControls();
-  state.dataset = createDataset(state.kind, state.sampleCount, state.noise, state.seed);
+  state.dataset = createDataset(state.kind, state.sampleCount, state.noise, state.seed, state.labelNoise);
   buildModel();
   updateAll();
+  tutor = new Tutor({
+    root: byId("tutor"),
+    badge: byId("tutorBadge"),
+    getSnapshot: tutorSnapshot,
+    applySetup: applyTutorSetup,
+    onNavigate: (event) => {
+      if (event.type === "complete") showToast(`第 ${event.index + 1} 关完成，+100 XP`);
+      if (event.type === "graduated") showToast("全部关卡完成！现在可以自由探索了。");
+    },
+  });
+  tutor.refresh(true);
 }
 
 initialize();

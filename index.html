@@ -22,6 +22,11 @@
         <span class="brand-copy"><strong>Neural Playground</strong><small>神经网络实验台</small></span>
       </a>
       <div class="topbar-meta">
+        <button class="tutor-badge" id="tutorBadge" type="button" aria-label="打开学习关卡" title="点击回到当前关卡">
+          <span class="tutor-badge-dot" aria-hidden="true"></span>
+          <span class="tutor-badge-copy"><strong>学习模式</strong><small id="tutorBadgeRank">观察员</small></span>
+          <span class="tutor-badge-count" id="tutorBadgeText">0 / 10</span>
+        </button>
         <span class="local-badge"><i></i>浏览器本地训练</span>
         <a href="#about">实验说明</a>
       </div>
@@ -32,7 +37,11 @@
         <div class="hero-copy">
           <p class="eyebrow">AI FUNDAMENTALS · INTERACTIVE LAB</p>
           <h1>看见神经网络<br /><span>如何学会分类。</span></h1>
-          <p class="hero-lead">生成数据、选择模型、启动训练，观察决策边界如何一步步形成。没有后端，没有 API Key，所有计算都发生在你的浏览器里。</p>
+          <p class="hero-lead">跟着 10 个关卡，从「一条直线为什么分不开两个圈」开始，一步步看懂神经网络如何学习、如何调参。没有后端，没有 API Key，所有计算都发生在你的浏览器里。</p>
+          <div class="hero-actions">
+            <button class="button button-primary button-hero" id="heroStartButton" type="button">开始引导学习 →</button>
+            <span>10 关 · 约 20 分钟 · 不需要任何基础</span>
+          </div>
         </div>
         <div class="hero-stats" aria-label="当前实验状态">
           <div class="hero-stat"><strong id="heroDataset">双月牙</strong><span>当前数据集</span></div>
@@ -43,6 +52,33 @@
 
       <section class="workspace" aria-label="神经网络训练工作区">
         <aside class="panel controls">
+          <section class="tutor" id="tutor" aria-label="学习关卡">
+            <div class="tutor-head">
+              <span class="tutor-chip" id="tutorChapter">第 1 章 · 先看懂问题</span>
+              <button class="tutor-link" id="tutorMapButton" type="button" aria-expanded="false">关卡地图</button>
+            </div>
+            <button class="tutor-resume" id="tutorResume" type="button" hidden>继续学习</button>
+            <div class="tutor-body" id="tutorBody">
+              <div class="tutor-title-row">
+                <h3 id="tutorTitle">让机器从例子里学会一件事</h3>
+                <span class="tutor-index" id="tutorIndex">1 / 10</span>
+              </div>
+              <p class="tutor-question" id="tutorQuestion"></p>
+              <ol class="tutor-steps" id="tutorSteps"></ol>
+              <p class="tutor-hint" id="tutorHint" hidden></p>
+              <div class="tutor-result" id="tutorResult" hidden></div>
+              <div class="tutor-actions">
+                <button class="tutor-btn" id="tutorHintButton" type="button">提示</button>
+                <button class="tutor-btn" id="tutorSetupButton" type="button">恢复本关设置</button>
+                <button class="tutor-btn" id="tutorSkipButton" type="button">跳过</button>
+                <button class="tutor-btn tutor-btn-primary" id="tutorAction" type="button" hidden>开始训练 →</button>
+                <button class="tutor-btn tutor-btn-primary" id="tutorNextButton" type="button" hidden>下一关 →</button>
+              </div>
+              <button class="tutor-link tutor-exit" id="tutorExitButton" type="button">退出引导，自由探索</button>
+            </div>
+            <div class="tutor-map" id="tutorMap" hidden></div>
+          </section>
+
           <div class="panel-heading">
             <div><span class="section-kicker">EXPERIMENT SETUP</span><h2>实验参数</h2></div>
             <span class="step-badge">01</span>
@@ -50,7 +86,7 @@
 
           <div class="beginner-tip">
             <span>第一次使用？</span>
-            <p>不用理解参数。点击“一键演示”，网站会自动选择模型并开始训练。</p>
+            <p>跟着上方关卡一步步做，每关都会自动配好参数。想直接看效果，也可以点下面的“一键演示”。</p>
           </div>
 
           <button class="button button-demo" id="demoButton" type="button">
@@ -79,8 +115,13 @@
           </div>
 
           <div class="range-field">
+            <label for="labelNoiseRange"><span>错误标签（训练集）</span><output id="labelNoiseValue">0%</output></label>
+            <input id="labelNoiseRange" type="range" min="0" max="0.3" step="0.01" value="0" />
+          </div>
+
+          <div class="range-field">
             <label for="sampleRange"><span>训练样本数</span><output id="sampleValue">400</output></label>
-            <input id="sampleRange" type="range" min="160" max="800" step="20" value="400" />
+            <input id="sampleRange" type="range" min="80" max="800" step="20" value="400" />
           </div>
 
           <div class="divider"></div>
